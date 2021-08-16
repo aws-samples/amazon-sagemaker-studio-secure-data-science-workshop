@@ -1,0 +1,355 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+Description: |
+  CloudFormation template for creating SageMaker Studio UserProfiles for data science project and environment combination.
+
+Parameters:
+  TeamName:
+    Type: String
+    AllowedPattern: '[A-Za-z0-9\-]*'
+    Description: Please specify your tean name.  Used as a suffix for team's resource names.
+
+  EnvType:
+    Description: System Environment. Used as a suffix for team and environment resource names.
+    Type: String
+    Default: dev
+
+  SharedServiceStackSetName:
+    Type: String
+    Default: DSSharedServices
+    Description: Common root name used across shared service cloudformation resources
+
+  StudioUserProfileName:
+    Description: Studio user profile name
+    Type: String
+
+  InstanceType:
+    Description: The instance type for the SageMaker notebook. If creating Jupyter server, you may not modify the default.
+    Type: String
+    Default: ml.t3.medium
+    AllowedValues:
+      - ml.m5.2xlarge
+      - ml.m5.4xlarge
+      - ml.m5.8xlarge
+      - ml.m5.large
+      - ml.m5.xlarge
+      - ml.p3.16xlarge
+      - ml.p3.2xlarge
+      - ml.p3.8xlarge
+      - ml.t3.2xlarge
+      - ml.t3.large
+      - ml.t3.medium
+      - ml.t3.micro
+      - ml.t3.small
+      - ml.t3.xlarge
+      - system
+
+  DeploymentInstanceType:
+    Description: Allowed Instance Type to Deploy Models
+    Type: String
+    Default: ml.c5.large
+    AllowedValues:
+      - ml.m5.2xlarge
+      - ml.m5.4xlarge
+      - ml.m5.8xlarge
+      - ml.c5.large
+      - ml.t3.medium
+
+Outputs:
+  StudioUserProfileName:
+    Description: name of created user profile
+    Value: !Ref SageMakerStudioUserProfile
+
+#  NotebookUrl:
+#    Description: Link to open Notebook
+#    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/sagemaker/home?region=${AWS::Region}#/notebook-instances/openNotebook/${NotebookInstance.NotebookInstanceName}?view=lab'
+
+Resources:
+  SageMakerExecRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /service-role/
+      RoleName: !Sub 'ds-notebook-role-${TeamName}-${EnvType}-${StudioUserProfileName}'
+      ManagedPolicyArns:
+        - !Ref SageMakerExecPolicy
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType
+
+  SageMakerExecPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'ssm:GetParameters'
+              - 'ssm:GetParameter'
+            Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ds-*'
+          - Effect: Allow
+            Action:
+              - 'sagemaker:CreateHyperParameterTuningJob'
+              - 'sagemaker:CreateProcessingJob'
+              - 'sagemaker:CreateTrainingJob'
+              - 'sagemaker:CreateAutoMLJob'
+              - 'sagemaker:CreateTransformJob'
+            Resource: '*'
+            Condition:
+              'BoolIfExists':
+                'sagemaker:InterContainerTrafficEncryption': 'true'
+              'Null':
+                'sagemaker:VolumeKmsKey': 'false'
+                'sagemaker:OutputKmsKey': 'false'
+          - Effect: Allow
+            Action:
+              - 'sagemaker:CreateEndpointConfig'
+            Resource: '*'
+            Condition:
+              'Null':
+                'sagemaker:VolumeKmsKey': 'false'
+              'ForAllValues:StringLike':
+                'sagemaker:InstanceTypes': !Ref DeploymentInstanceType
+          - Effect: Allow
+            Action:
+              - 'sagemaker:AssociateTrialComponent'
+              - 'sagemaker:CreateHyperParameterTuningJob'
+              - 'sagemaker:CreateProcessingJob'
+              - 'sagemaker:CreateTrainingJob'
+              - 'sagemaker:CreateAutoMLJob'
+              - 'sagemaker:CreateModel'
+              - 'sagemaker:CreateExperiment'
+              - 'sagemaker:CreateModelPackage'
+              - 'sagemaker:CreateModelPackageGroup'
+              - 'sagemaker:CreateTrial'
+              - 'sagemaker:CreateTrialComponent'
+              - 'sagemaker:CreateApp'
+              - 'sagemaker:DeleteApp'
+              - 'sagemaker:DescribeApp'
+              - 'sagemaker:DeleteExperiment'
+              - 'sagemaker:DeleteEndpointConfig'
+              - 'sagemaker:DeleteEndpoint'
+              - 'sagemaker:DeleteModel'
+              - 'sagemaker:DeleteModelPackage'
+              - 'sagemaker:DeleteModelPackageGroup'
+              - 'sagemaker:DeleteTrial'
+              - 'sagemaker:DeleteTrialComponent'
+              - 'sagemaker:StopAutoMLJob'
+              - 'sagemaker:StopHyperParameterTuningJob'
+              - 'sagemaker:StopTransformJob'
+              - 'sagemaker:UpdateEndpoint'
+              - 'sagemaker:UpdateEndpointWeightsAndCapacities'
+              - 'sagemaker:UpdateExperiment'
+              - 'sagemaker:UpdateTrial'
+              - 'sagemaker:UpdateTrialComponent'
+            Resource: '*'
+            Condition:
+              'ForAllValues:StringEqualsIfExists':
+                'sagemaker:VpcSubnets':
+                  - Fn::ImportValue:
+                      !Sub 'ds-subnet1-${SharedServiceStackSetName}'
+                  - Fn::ImportValue:
+                      !Sub 'ds-subnet2-${SharedServiceStackSetName}'
+                  - Fn::ImportValue:
+                      !Sub 'ds-subnet3-${SharedServiceStackSetName}'
+                'sagemaker:VpcSecurityGroupIds':
+                  - Fn::ImportValue:
+                      !Sub 'ds-sagemaker-vpc-sg-${SharedServiceStackSetName}'
+          - Effect: Allow
+            Action:
+              - 'sagemaker:List*'
+              - 'sagemaker:Describe*'
+              - 'sagemaker:Search'
+              - 'application-autoscaling:DeleteScalingPolicy'
+              - 'application-autoscaling:DeleteScheduledAction'
+              - 'application-autoscaling:DeregisterScalableTarget'
+              - 'application-autoscaling:DescribeScalableTargets'
+              - 'application-autoscaling:DescribeScalingActivities'
+              - 'application-autoscaling:DescribeScalingPolicies'
+              - 'application-autoscaling:DescribeScheduledActions'
+              - 'application-autoscaling:PutScalingPolicy'
+              - 'application-autoscaling:PutScheduledAction'
+              - 'application-autoscaling:RegisterScalableTarget'
+              - 'cloudwatch:DeleteAlarms'
+              - 'cloudwatch:DescribeAlarms'
+              - 'cloudwatch:GetMetricData'
+              - 'cloudwatch:GetMetricStatistics'
+              - 'cloudwatch:ListMetrics'
+              - 'cloudwatch:PutMetricAlarm'
+              - 'cloudwatch:PutMetricData'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateNetworkInterfacePermission'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteNetworkInterfacePermission'
+              - 'ec2:DescribeDhcpOptions'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribeRouteTables'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeVpcEndpoints'
+              - 'ec2:DescribeVpcs'
+              - 'elastic-inference:Connect'
+              - 'iam:ListRoles'
+              - 'lambda:ListFunctions'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:DescribeLogStreams'
+              - 'logs:GetLogEvents'
+              - 'logs:PutLogEvents'
+              - 'sns:ListTopics'
+              - 'codecommit:BatchGetRepositories'
+              - 'codecommit:ListRepositories'
+            Resource: '*'
+          - Sid: KMSKeyAccess
+            Effect: Allow
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:Decrypt'
+              - 'kms:DescribeKey'
+              - 'kms:Encrypt'
+              - 'kms:ReEncrypt'
+              - 'kms:GenerateDataKey'
+              - 'kms:ListAliases'
+            Resource:
+              - Fn::ImportValue:
+                  !Sub 'ds-kms-cmk-${TeamName}-${EnvType}-arn'
+              - Fn::ImportValue:
+                  !Sub 'ds-sagemaker-studio-kms-cmk-${SharedServiceStackSetName}-arn'
+              - Fn::ImportValue:
+                  !Sub 'ds-data-lake-kms-cmk-${SharedServiceStackSetName}-arn'
+          - Sid: CodeCommitAccess
+            Effect: Allow
+            Action:
+              - 'codecommit:GitPull'
+              - 'codecommit:GitPush'
+              - 'codecommit:*Branch*'
+              - 'codecommit:*PullRequest*'
+              - 'codecommit:*Commit*'
+              - 'codecommit:GetDifferences'
+              - 'codecommit:GetReferences'
+              - 'codecommit:GetRepository'
+              - 'codecommit:GetMerge*'
+              - 'codecommit:Merge*'
+              - 'codecommit:DescribeMergeConflicts'
+              - 'codecommit:*Comment*'
+              - 'codecommit:*File'
+              - 'codecommit:GetFolder'
+              - 'codecommit:GetBlob'
+            Resource:
+              - !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:ds-source-${TeamName}-${EnvType}'
+          - Sid: ECRAccess
+            Effect: Allow
+            Action:
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:GetRepositoryPolicy'
+              - 'ecr:DescribeRepositories'
+              - 'ecr:DescribeImages'
+              - 'ecr:ListImages'
+              - 'ecr:BatchGetImage'
+              - 'ecr:GetLifecyclePolicy'
+              - 'ecr:GetLifecyclePolicyPreview'
+              - 'ecr:ListTagsForResource'
+              - 'ecr:DescribeImageScanFindings'
+            Resource:
+              - 'arn:aws:ecr:*:*:repository/*sagemaker*'
+              - Fn::Join:
+                - ''
+                - - 'arn:aws:ecr:*:*:repository/'
+                  - Fn::ImportValue:
+                      !Sub 'ds-shared-ecr-repository-${SharedServiceStackSetName}'
+          - Sid: ECRAuthTokenAccess
+            Effect: Allow
+            Action:
+              - 'ecr:GetAuthorizationToken'
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - "arn:aws:s3:::sagemaker-*/*"
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
+              - 's3:DeleteObject'
+              - 's3:ListBucket'
+            Resource:
+              - !Sub 'arn:aws:s3:::ds-data-bucket-${TeamName}-${EnvType}-*'
+              - !Sub 'arn:aws:s3:::ds-data-bucket-${TeamName}-${EnvType}-*/*'
+              - !Sub 'arn:aws:s3:::ds-model-bucket-${TeamName}-${EnvType}-*'
+              - !Sub 'arn:aws:s3:::ds-model-bucket-${TeamName}-${EnvType}-*/*'
+              - 'arn:aws:s3:::ds-data-lake*'
+              - 'arn:aws:s3:::ds-data-lake*/*'
+          - Effect: Allow
+            Action:
+              - 's3:GetBucketLocation'
+              - 's3:ListBucket*'
+              - 's3:ListAllMyBuckets'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'lambda:InvokeFunction'
+            Resource:
+              - 'arn:aws:lambda:*:*:function:*SageMaker*'
+              - 'arn:aws:lambda:*:*:function:*sagemaker*'
+              - 'arn:aws:lambda:*:*:function:*Sagemaker*'
+              - 'arn:aws:lambda:*:*:function:*LabelingFunction*'
+          - Action: 'iam:CreateServiceLinkedRole'
+            Effect: Allow
+            Resource: 'arn:aws:iam::*:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint'
+            Condition:
+              StringLike:
+                'iam:AWSServiceName': sagemaker.application-autoscaling.amazonaws.com
+          - Effect: Allow
+            Action:
+              - 'sns:Subscribe'
+              - 'sns:CreateTopic'
+            Resource:
+              - 'arn:aws:sns:*:*:*SageMaker*'
+              - 'arn:aws:sns:*:*:*Sagemaker*'
+              - 'arn:aws:sns:*:*:*sagemaker*'
+          - Effect: Allow
+            Action:
+              - 'iam:PassRole'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'iam:PassedToService':
+                  - sagemaker.amazonaws.com
+
+  SageMakerStudioUserProfile:
+    Type: AWS::SageMaker::UserProfile
+    Properties:
+      DomainId:
+        Fn::ImportValue:
+          !Sub 'ds-sagemaker-studio-${SharedServiceStackSetName}-domain-id'
+      UserProfileName: !Ref StudioUserProfileName
+      UserSettings:
+        ExecutionRole: !GetAtt SageMakerExecRole.Arn
+        SharingSettings:
+          NotebookOutputOption: Disabled
+        SecurityGroups:
+          - Fn::ImportValue:
+              !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
+      Tags:
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType

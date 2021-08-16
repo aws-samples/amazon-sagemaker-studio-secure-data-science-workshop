@@ -1,0 +1,13 @@
+{
+  "DomainId": "d-f4begctixzdw",
+  "DefaultUserSettings": {
+    "KernelGatewayAppSettings": {
+      "CustomImages": [
+        {
+          "ImageName": "ds-custom-tensorflow241",
+          "AppImageConfigName": "ds-tensorflow241-image-config"
+        }
+      ]
+    }
+  }
+}

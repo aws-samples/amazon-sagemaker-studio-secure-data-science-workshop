@@ -1,0 +1,312 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+# The following template is designed to onboard SageMaker Studio Domain in VPCOnly secure environment for data science.
+# The template depends on shared SageMaker Studio VPC and DataScience Administration role created by ds_administration.yaml.
+# This template creates a KMS CMK, resources required for custom sagemaker image for tensorflow, a default data scientist role,
+# and omboards SageMaker Studio Domain with default user settings.
+Description: |
+  CloudFormation template for creating and onboarding SageMaker Studio
+
+Parameters:
+  SharedServiceStackSetName:
+    Type: String
+    Description: Shared Service stack set name, common across data science stacks
+
+  StudioDomainName:
+    Description: Studio domain name
+    AllowedPattern: '^[a-zA-Z0-9](-*[a-zA-Z0-9]){0,62}'
+    Type: String
+    Default: ds-studio-domain
+
+  KMSAlias:
+    Type: String
+    Default: ds-sagemaker-studio-kms
+
+  CustomImageEcrUri:
+    Type: String
+    Description: Custom Images URI in ECR of format ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/ECR_REPOSITORY_NAME:IMAGE_NAME
+
+  CustomImageName:
+    Type: String
+    Description: Custom Image name
+
+  CustomImageDescription:
+    Type: String
+    Description: Custom Image description
+
+  AppImageConfigName:
+    Type: String
+    Description: App image config name for SageMaker custom image
+
+  KernelSpecsName:
+    Type: String
+    Description: Jupyter kernel name for SageMaker custom image, kernel name must match the name in custom name per to Jupyter kernel specs https://jupyter-client.readthedocs.io/en/stable/kernels.html
+    Default: python3
+
+  KernelSpecsDisplayName:
+    Type: String
+    Description: Jupyter kernel display name, this name is displayed in custom images in Studio
+    Default: Python 3
+
+Outputs:
+  StudioDomainId:
+    Description: SageMaker Studio Domain ID
+    Value: !Ref SageMakerStudioDomain
+    Export:
+      Name: !Sub 'ds-sagemaker-studio-${SharedServiceStackSetName}-domain-id'
+
+  StudioUrl:
+    Description: Link to open SageMaker Studio
+    Value: !GetAtt SageMakerStudioDomain.Url
+
+  EFSKmsKeyId:
+    Description: KMS Key Id for the Studio EFS encryption
+    Value: !Ref SagemakerStudioKMS
+
+  EFSKmsKeyArn:
+    Description: KMS Key ARN for the Studio EFS encryption
+    Value: !GetAtt SagemakerStudioKMS.Arn
+    Export:
+      Name: !Sub 'ds-sagemaker-studio-kms-cmk-${SharedServiceStackSetName}-arn'
+
+Resources:
+  SagemakerStudioKMS:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: Generated KMS Key for Sagemaker Studio's EFS encryption
+      EnableKeyRotation: true
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: KmsKey-EfsSagemakerStudioKey
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow access for Key Administrators
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::ImportValue:
+                  !Sub "ds-administrator-role-${SharedServiceStackSetName}-arn"
+            Resource: '*'
+          - Sid: Allow access for Key Users
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:CreateGrant'
+              - 'kms:ReEncrypt'
+              - 'kms:GenerateDataKey'
+              - 'kms:DescribeKey'
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                'aws:SourceVpce':
+                  Fn::ImportValue:
+                    !Sub "ds-s3-endpoint-${SharedServiceStackSetName}-id"
+      Tags:
+        - Key: StudioDomainName
+          Value: !Ref StudioDomainName
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  KeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/${KMSAlias}
+      TargetKeyId: !Ref SagemakerStudioKMS
+
+  SageMakerCustomImage:
+    Type: AWS::SageMaker::Image
+    Properties:
+      ImageDescription: !Ref CustomImageDescription
+      ImageDisplayName: !Ref CustomImageDescription
+      ImageName: !Ref CustomImageName
+      # Requires SageMakerFullAccess
+      ImageRoleArn:
+        Fn::ImportValue:
+          !Sub 'ds-administrator-role-${SharedServiceStackSetName}-arn'
+      Tags:
+        - Key: StudioDomainName
+          Value: !Ref StudioDomainName
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  SageMakerCustomImageVersion:
+    Type: AWS::SageMaker::ImageVersion
+    DependsOn:
+      - SageMakerCustomImage
+    Properties:
+      BaseImage: !Ref CustomImageEcrUri
+      ImageName: !Ref CustomImageName
+
+  SageMakerCustomImageAppConfig:
+    Type: AWS::SageMaker::AppImageConfig
+    DependsOn:
+      - SageMakerCustomImageVersion
+    Properties:
+      AppImageConfigName: !Ref AppImageConfigName
+      KernelGatewayImageConfig:
+        FileSystemConfig:
+          DefaultGid: 100
+          DefaultUid: 1000
+          MountPath: '/home/jovyan/work'
+        KernelSpecs:
+          - DisplayName: !Ref KernelSpecsDisplayName
+            Name: !Ref KernelSpecsName
+      Tags:
+        - Key: StudioDomainName
+          Value: !Ref StudioDomainName
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  DataScientistDefaultRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'sts:AssumeRole'
+          - Sid: SageMakerTrustRelantionship
+            Effect: Allow
+            Principal:
+              Service:
+                - 'sagemaker.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      RoleName: !Sub "ds-default-user-role-${SharedServiceStackSetName}"
+      Policies:
+        - PolicyName: SageMakerAccessInlinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DataScientistAdditionalPolicies
+                Effect: Allow
+                Action:
+                  - 'sagemaker:UpdateCodeRepository'
+                  - 'sagemaker:DeleteCodeRepository'
+                  - 'sagemaker:CreateCodeRepository'
+                  - 'sagemaker:StartNotebookInstance'
+                  - 'sagemaker:StopNotebookInstance'
+                  - 'sagemaker:CreateApp'
+                  - 'sagemaker:AddTags'
+                  - 'sagemaker:DeleteApp'
+                  - 'sagemaker:GetSagemakerServicecatalogPortfolioStatus'
+                  - 'codecommit:BatchGetRepositories'
+                  - 'codecommit:GitPull'
+                  - 'codecommit:GitPush'
+                  - 'codecommit:CreateBranch'
+                  - 'codecommit:DeleteBranch'
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:ListBranches'
+                  - 'codecommit:CreatePullRequest'
+                  - 'codecommit:CreatePullRequestApproval'
+                  - 'codecommit:GetPullRequest'
+                  - 'codecommit:CreateCommit'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:GetCommitHistory'
+                  - 'codecommit:GetDifferences'
+                  - 'codecommit:GetReferences'
+                  - 'codecommit:CreateRepository'
+                  - 'codecommit:GetRepository'
+                  - 'codecommit:ListRepositories'
+                  - 'iam:TagRole'
+                  - 'kms:CreateGrant'
+                  - 'kms:DescribeKey'
+                  - 'servicecatalog:ListAcceptedPortfolioShares'
+                Resource: '*'
+              - Sid: SageMakerIamPassRole
+                Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService':
+                      - sagemaker.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSServiceCatalogEndUserFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSLambda_ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeCommitReadOnly'
+        - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerReadOnly'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+      Tags:
+        - Key: StudioDomainName
+          Value: !Ref StudioDomainName
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  DataScientistDefaultRoleArn:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-default-user-role-${SharedServiceStackSetName}-arn"
+      Type: String
+      Value: !GetAtt DataScientistDefaultRole.Arn
+      Description: SSM-Parameter - Default DataScientist Role Arn
+
+  SageMakerStudioDomain:
+    Type: AWS::SageMaker::Domain
+    DependsOn:
+      - SageMakerCustomImageAppConfig
+    Properties:
+      AppNetworkAccessType: VpcOnly
+      AuthMode: 'IAM'
+      DefaultUserSettings:
+        ExecutionRole: !GetAtt DataScientistDefaultRole.Arn
+        SecurityGroups: 
+          - Fn::ImportValue:
+              !Sub 'ds-sagemaker-vpc-sg-${SharedServiceStackSetName}'
+        SharingSettings:
+          NotebookOutputOption: Disabled
+        KernelGatewayAppSettings:
+          CustomImages:
+            - AppImageConfigName: !Ref AppImageConfigName
+              ImageName:  !Ref CustomImageName
+          DefaultResourceSpec:
+            InstanceType: 'ml.t3.medium'
+            SageMakerImageArn: !Ref SageMakerCustomImage
+            SageMakerImageVersionArn: !GetAtt SageMakerCustomImageVersion.ImageVersionArn
+      DomainName: !Ref StudioDomainName
+      KmsKeyId: !Ref SagemakerStudioKMS
+      SubnetIds:
+        - Fn::ImportValue:
+           !Sub 'ds-subnet1-${SharedServiceStackSetName}'
+        - Fn::ImportValue:
+            !Sub 'ds-subnet2-${SharedServiceStackSetName}'
+        - Fn::ImportValue:
+            !Sub 'ds-subnet3-${SharedServiceStackSetName}'
+      VpcId:
+        Fn::ImportValue: !Sub 'ds-vpc-${SharedServiceStackSetName}'
+      Tags:
+        - Key: StackSetName
+          Value: !Ref SharedServiceStackSetName

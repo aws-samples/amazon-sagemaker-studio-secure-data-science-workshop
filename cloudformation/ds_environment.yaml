@@ -1,0 +1,89 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+# The following template is designed to provision and configure a secure environment for data science teams.
+# This template creates team and environment specific resources: a KMS CMK, an data science administrator and
+# data scientist role, and an S3 bucket.
+# Lastly the template stores outputs into Parameter Store so they can be referenced later by SC products.
+Description: Data Science Environment
+
+Parameters:
+  TeamName:
+    Type: String
+    AllowedPattern: '[a-z0-9\-]*'
+    Description: Please specify your Team Name.  Used as a suffix for team resource names. Mandatory LOWER CASE.
+
+  EnvType:
+    Description: >-
+      Please specify the target Environment. Used for tagging and resource
+      names. Mandatory LOWER CASE.
+    Type: String
+    AllowedPattern: '[a-z0-9\-]*'
+    Default: dev
+
+  SharedServiceStackSetName:
+    Type: String
+    Default: DSSharedServices
+    Description: Common root name used across shared service cloudformation resources
+
+Outputs:
+  AssumeDataScienceAdminRole:
+    Description: URL for assuming the role of a data science admininstrator
+    Value: !GetAtt DSEnvironmentPrincipals.Outputs.AssumeDataScienceAdminRole
+
+  AssumeDataScientistUserRole:
+    Description: URL for assuming the role of a data science user
+    Value: !GetAtt DSEnvironmentPrincipals.Outputs.AssumeDataScientistUserRole
+
+Resources:
+  DSEnvironmentPrincipals:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        TeamName: !Ref TeamName
+        EnvType: !Ref EnvType
+      TemplateURL: ds_env_principals.yaml
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType
+  
+  DSEnvironmentBackingStore:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DSEnvironmentPrincipals
+    Properties:
+      Parameters:
+        SharedServiceStackSetName: !Ref SharedServiceStackSetName
+        TeamName: !Ref TeamName
+        EnvType: !Ref EnvType
+      TemplateURL: ds_env_backing_store.yaml
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType
+
+  DSEnvironmentResourceGroup:
+    Type: "AWS::ResourceGroups::Group"
+    Properties:
+      Name: !Sub 'ds-${TeamName}-${EnvType}-resource-group'
+      Description: !Sub 'AWS Resources belonging to ${TeamName} in its ${EnvType} environment.'
+      ResourceQuery:
+        Type: "TAG_FILTERS_1_0" 
+        Query:
+          ResourceTypeFilters: 
+            - "AWS::AllSupported" 
+          TagFilters:
+            - Key: "TeamName"
+              Values: 
+                - !Sub '${TeamName}'
+            - Key: "EnvironmentType" 
+              Values: 
+                - !Sub '${EnvType}'
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType

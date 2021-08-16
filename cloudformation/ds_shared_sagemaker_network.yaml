@@ -1,0 +1,677 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+Description: |
+  Create a secure VPC designed to host SageMaker Studio and data science project teams.
+
+Parameters:
+  SharedServiceStackSetName:
+    Type: String
+    Description: The data science shared services stack set name
+
+  SageMakerStudioVpcCIDR:
+    Type: String
+    Default: 10.2.0.0/16
+    Description: CIDR range for SageMaker Studio VPC
+
+  SageMakerStudioSubnet1CIDR:
+    Type: String
+    Default: 10.2.1.0/24
+    Description: CIDR range for SageMaker Studio Subnet A
+
+  SageMakerStudioSubnet2CIDR:
+    Type: String
+    Default: 10.2.2.0/24
+    Description: CIDR range for SageMaker Studio Subnet B
+
+  SageMakerStudioSubnet3CIDR:
+    Type: String
+    Default: 10.2.3.0/24
+    Description: CIDR range for SageMaker Studio Subnet C
+
+Outputs:
+  S3VPCEndpointId:
+    Description: The ID of the S3 VPC Endpoint
+    Value: !Ref VPCEndpointS3
+    Export: 
+      Name: !Sub "ds-s3-endpoint-${SharedServiceStackSetName}-id"
+
+  CodeArtifactAPIEndpointDNS:
+    Description: DNS entries for the CodeArtifact API VPC endpoint
+    Value:
+      Fn::Select:
+        - 0
+        - !GetAtt VPCEndpointCodeArtifactApi.DnsEntries
+    Export:
+      Name: !Sub 'ds-codeartifact-api-endpoint-${SharedServiceStackSetName}-dns'
+
+  CodeArtifactRepositoryEndpointDNS:
+    Description: DNS entries for the CodeArtifact Repository VPC endpoint
+    Value:
+      Fn::Select:
+        - 0
+        - !GetAtt VPCEndpointCodeArtifactRepository.DnsEntries
+    Export:
+      Name: !Sub 'ds-codeartifact-repository-endpoint-${SharedServiceStackSetName}-dns'
+
+  SageMakerVPC:
+    Description: The SageMaker VPC ID
+    Value: !Ref SageMakerVPC
+    Export:
+      Name: !Sub 'ds-vpc-${SharedServiceStackSetName}'
+
+  Subnet1Id:
+    Description: The ID of the first Subnet
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub 'ds-subnet1-${SharedServiceStackSetName}'
+
+  Subnet2Id:
+    Description: The ID of the second Subnet
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name: !Sub 'ds-subnet2-${SharedServiceStackSetName}'
+
+  Subnet3Id:
+    Description: The ID of the third Subnet
+    Value: !Ref PrivateSubnetC
+    Export:
+      Name: !Sub 'ds-subnet3-${SharedServiceStackSetName}'
+
+  SageMakerSecurityGroup:
+    Description: Security Group ID for the SageMaker Resources
+    Value: !GetAtt SageMakerSecurityGroup.GroupId
+    Export:
+      Name: !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-193858265520-us-east-1"
+    us-east-2:
+      S3BUCKETARN: "arn:aws:s3:::assets-250872398865-us-east-2"
+    us-west-2:
+      S3BUCKETARN: "arn:aws:s3:::assets-787052242323-us-west-2"
+    eu-west-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-438097961670-eu-west-1"
+    eu-west-2:
+      S3BUCKETARN: "arn:aws:s3:::assets-247805302724-eu-west-2"
+    eu-west-3:
+      S3BUCKETARN: "arn:aws:s3:::assets-762466490029-eu-west-3"
+    eu-north-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-611884512288-eu-north-1"
+    eu-south-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-484130244270-eu-south-1"
+    eu-central-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-769407342218-eu-central-1"
+    ap-northeast-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-660291247815-ap-northeast-1"
+    ap-southeast-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-421485864821-ap-southeast-1"
+    ap-southeast-2:
+      S3BUCKETARN: "arn:aws:s3:::assets-860415559748-ap-southeast-2"
+    ap-south-1:
+      S3BUCKETARN: "arn:aws:s3:::assets-681137435769-ap-south-1"
+
+Resources:
+  #########################
+  #
+  # VPC AND SUBNETS
+  #
+  #########################
+  SageMakerVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref SageMakerStudioVpcCIDR
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-vpc-${SharedServiceStackSetName}"
+
+  SageMakerVPCId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-vpc-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !Ref SageMakerVPC
+      Description: SageMaker VPC ID
+
+  PrivateSubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref SageMakerVPC
+      CidrBlock: !Ref SageMakerStudioSubnet1CIDR
+      AvailabilityZone: !Sub  "${AWS::Region}a"
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-subnet-a-${SharedServiceStackSetName}"
+
+  PrivateSubnetAId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-subnet-a-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !Ref PrivateSubnetA
+      Description: Private Subnet-A ID
+
+  PrivateSubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref SageMakerVPC
+      CidrBlock: !Ref SageMakerStudioSubnet2CIDR
+      AvailabilityZone: !Sub  "${AWS::Region}b"
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-subnet-b-${SharedServiceStackSetName}"
+
+  PrivateSubnetBId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-subnet-b-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !Ref PrivateSubnetB
+      Description: Private Subnet-B ID
+
+  PrivateSubnetC:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref SageMakerVPC
+      CidrBlock: !Ref SageMakerStudioSubnet3CIDR
+      AvailabilityZone: !Sub  "${AWS::Region}c"
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-subnet-c-${SharedServiceStackSetName}"
+
+  PrivateSubnetCId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-subnet-c-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !Ref PrivateSubnetC
+      Description: Private Subnet-B ID
+
+  #########################
+  #
+  # ROUTE TABLES
+  #
+  #########################
+
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref SageMakerVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-vpc-rt-${SharedServiceStackSetName}"
+
+  PrivateSubnetRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetA
+
+  PrivateSubnetRouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetB
+
+  PrivateSubnetRouteTableAssociation3:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetC
+
+  #########################
+  #
+  # SECURITY GROUPS
+  #
+  #########################
+      
+  VPCEndpointSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow TLS for VPC Endpoint
+      VpcId: !Ref SageMakerVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !GetAtt SageMakerSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-vpc-https-ingress-sg-${SharedServiceStackSetName}"
+
+  SageMakerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Security Group for SageMaker Studio Notebook, Training Job and Hosting Endpoint'
+      VpcId: !Ref SageMakerVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
+
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: '-1'
+      GroupId: !Ref SageMakerSecurityGroup
+      SourceSecurityGroupId: !Ref SageMakerSecurityGroup
+
+  SageMakerSecurityGroupId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !GetAtt SageMakerSecurityGroup.GroupId
+      Description: SageMaker Security Group ID
+
+  SharedServicesVPCEndpointSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow HTTP for VPC Endpoint
+      VpcId: !Ref SageMakerVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt SageMakerSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-vpc-http-ingress-sg-${SharedServiceStackSetName}"
+
+  #########################
+  #
+  # VPC ENDPOINTS
+  #
+  #########################
+  VPCEndpointS3:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      VpcId: !Ref SageMakerVPC
+      PolicyDocument: 
+        !Sub
+          - |
+            {
+              "Version":"2012-10-17",
+              "Statement":[{
+                "Effect":"Allow",
+                "Principal": "*",
+                "Action":[
+                  "s3:GetObject",
+                  "s3:PutObject",
+                  "s3:ListBucket"
+                ],
+                "Resource":[
+                  "arn:aws:s3:::ds-model-bucket-*",
+                  "arn:aws:s3:::ds-data-bucket-*",
+                  "arn:aws:s3:::ds-model-bucket-*/*",
+                  "arn:aws:s3:::ds-data-bucket-*/*",
+                  "arn:aws:s3:::*ds-data-lake*",
+                  "arn:aws:s3:::*ds-data-lake*/*"
+                  ]
+              },
+              {
+                "Sid": "S3PolicyForCodeArtifact",
+                "Principal": "*",
+                "Action": [
+                    "s3:GetObject"
+                  ],
+                "Effect": "Allow",
+                "Resource": ["${CODE_ARTIFACT_ASSET_S3_BUCKET}/*"]
+              },
+              {
+                "Sid": "S3AccessToEcrSpecificBucket",
+                "Principal": "*",
+                "Action": [
+                  "s3:GetObject"
+                ],
+                "Effect": "Allow",
+                "Resource": ["arn:aws:s3:::prod-${AWS::Region}-starport-layer-bucket/*"]
+              }
+              ]
+            }
+          - CODE_ARTIFACT_ASSET_S3_BUCKET:
+              Fn::FindInMap:
+                - RegionMap
+                - !Ref 'AWS::Region'
+                - S3BUCKETARN
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  VPCEndpointS3Id:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-s3-endpoint-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !Ref VPCEndpointS3
+      Description: S3 VPC Endpoint ID
+
+  VPCEndpointSSM:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointCW:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.monitoring'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointCWL:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointSagemakerAPI:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sagemaker.api'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointSageMakerRuntime:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sagemaker.runtime'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointSageMakerNotebook:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'aws.sagemaker.${AWS::Region}.notebook'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointSTS:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sts'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointCodeCommit:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.git-codecommit'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointCodeCommitAPI:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.codecommit'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointCodeArtifactApi:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 'codeartifact:Describe*'
+              - 'codeartifact:Get*'
+              - 'codeartifact:List*'
+              - 'codeartifact:ReadFromRepository'
+            Resource: '*'
+#              - !Sub
+#                - 'arn:aws:codeartifact:*:*:domain/${CODE_ARTIFACT_DOMAIN_NAME}'
+#                - CODE_ARTIFACT_DOMAIN_NAME:
+#                    Fn::ImportValue: !Sub 'ds-shared-code-artifact-domain-${SharedServiceStackSetName}'
+          - Effect: Allow
+            Principal: '*'
+            Action: 'sts:GetServiceBearerToken'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'sts:AWSServiceName': 'codeartifact.amazonaws.com'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.codeartifact.api'
+      VpcId: !Ref SageMakerVPC
+
+  SSMCodeArtifactApiVPCEndpointDNS:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: "ds-codeartifact-api-dns"
+      Type: String
+      Value:
+        Fn::Select:
+          - 1
+          - Fn::Split:
+              - ":"
+              - Fn::Select:
+                  - 0
+                  - !GetAtt VPCEndpointCodeArtifactApi.DnsEntries
+      Description: Data Science CodeArtifact Service API VPC Endpoint DNS name
+
+  VPCEndpointCodeArtifactRepository:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 'codeartifact:Describe*'
+              - 'codeartifact:Get*'
+              - 'codeartifact:List*'
+              - 'codeartifact:ReadFromRepository'
+            Resource: '*'
+#              - !Sub
+#                  - 'arn:aws:codeartifact:*:*:repository/${CODE_ARTIFACT_DOMAIN_NAME}/*'
+#                  - CODE_ARTIFACT_DOMAIN_NAME:
+#                      Fn::ImportValue: !Sub 'ds-shared-code-artifact-domain-${SharedServiceStackSetName}'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.codeartifact.repositories'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointECR:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointECRAPI:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcId: !Ref SageMakerVPC
+
+  VPCEndpointKMS:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+        - !Ref PrivateSubnetC
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.kms'
+      VpcId: !Ref SageMakerVPC

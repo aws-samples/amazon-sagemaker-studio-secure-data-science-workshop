@@ -1,0 +1,16 @@
+{
+  "AppImageConfigName": "ds-tensorflow250-image-config",
+  "KernelGatewayImageConfig": {
+    "KernelSpecs": [
+      {
+        "Name": "python3",
+        "DisplayName": "Python 3 (TensorFlow 2.5.0)"
+      }
+    ],
+    "FileSystemConfig": {
+      "MountPath": "/root/data",
+      "DefaultUid": 0,
+      "DefaultGid": 0
+    }
+  }
+}

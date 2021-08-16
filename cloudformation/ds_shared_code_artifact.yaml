@@ -1,0 +1,86 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+Description: |
+  Create a shared CodeArtifact repository to host python modules from public PyPI repository (https://pypi.org/) for
+  a data science project team.
+
+Parameters:
+  StackSetName:
+    Type: String
+    Description: A name to be used across nested stacks
+
+  CodeArtifactDomainName:
+    Type: String
+    Default: ds-domain
+    Description: Code Artifact shared data science domain name
+
+  CodeArtifactRepositoryName:
+    Type: String
+    Default: ds-shared-repo
+    Description: Code Artifact shared data science repository name
+
+  CodeArtifactPublicPyPIRepositoryName:
+    Type: String
+    Default: ds-public-upstream-repo
+    Description: Code Artifact upstream repository name with external connection to public PyPI
+
+Outputs:
+  SharedCodeArtifactDomain:
+    Description: The domain of the Shared CodeArtifact
+    Value: !Ref CodeArtifactDomainName
+    Export:
+      Name: !Sub 'ds-shared-code-artifact-domain-${StackSetName}'
+
+  SharedCodeArtifactRepository:
+    Description: The shared CodeArtifact repository
+    Value: !Ref CodeArtifactRepositoryName
+    Export:
+      Name: !Sub 'ds-shared-code-artifact-repository-${StackSetName}'
+
+Resources:
+  SharedDSCodeArtifactDomain:
+    Type: 'AWS::CodeArtifact::Domain'
+    Properties:
+      DomainName: !Ref CodeArtifactDomainName
+
+  DSCodeArtifactPublicRepository:
+    Type: 'AWS::CodeArtifact::Repository'
+    Properties:
+      Description: Upstream repository for shared data science repository with external connection to public PyPi repository
+      RepositoryName: !Ref CodeArtifactPublicPyPIRepositoryName
+      DomainName: !GetAtt SharedDSCodeArtifactDomain.Name
+      ExternalConnections:
+        - public:pypi
+
+  SharedDSCodeArtifactRepository:
+    Type: 'AWS::CodeArtifact::Repository'
+    Properties:
+      Description: Shared asset repository to host python package and modules for data science projects
+      RepositoryName: !Ref CodeArtifactRepositoryName
+      DomainName: !GetAtt SharedDSCodeArtifactDomain.Name
+      Upstreams:
+        - !GetAtt DSCodeArtifactPublicRepository.Name
+
+  SSMCodeArtifactDomain:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: "ds-codeartifact-domain-name"
+      Type: String
+      Value: !GetAtt SharedDSCodeArtifactDomain.Name
+      Description: Data Science CodeArtifact Domain Name
+
+  SSMCodeArtifactDomainOwner:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: "ds-codeartifact-domain-owner"
+      Type: String
+      Value: !Ref "AWS::AccountId"
+      Description: Data Science CodeArtifact Domain Owner i.e. the AWS Account
+
+  SSMCodeArtifactRepository:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: "ds-codeartifact-repository"
+      Type: String
+      Value: !GetAtt SharedDSCodeArtifactRepository.Name
+      Description: Data Science CodeArtifact Repository Name

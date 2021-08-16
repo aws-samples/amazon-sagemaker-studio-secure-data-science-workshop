@@ -1,0 +1,136 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+# This template creates an a shared S3 bucket to server data lake for data science teams.
+Description: Shared S3 data storage to server as data lake for data science teams.
+
+Parameters:
+  SharedServiceStackSetName:
+    Type: String
+    Description: Common root name used across shared service cloudformation resources
+
+Outputs:
+  DataLakeKMSCMK:
+    Description: KMS Key ARN for the shared data lake S3 bucket
+    Value: !GetAtt KMSCMK.Arn
+    Export:
+      Name: !Sub 'ds-data-lake-kms-cmk-${SharedServiceStackSetName}-arn'
+
+  DataLakeBucket:
+    Description: Shared service data lake S3 bucket name
+    Value: !Ref DataLakeBucket
+    Export:
+      Name: !Sub 'ds-s3-data-lake-${SharedServiceStackSetName}'
+
+Resources:
+  KMSCMK:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: KMS key for S3 data lake bucket
+      KeyPolicy:
+        Id: key-policy-1
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow access for Key Administrators
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::ImportValue:
+                  !Sub "ds-administrator-role-${SharedServiceStackSetName}-arn"
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: Allow access for Key Users
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:CreateGrant'
+              - 'kms:ReEncrypt'
+              - 'kms:GenerateDataKey'
+              - 'kms:DescribeKey'
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                'aws:SourceVpce':
+                  Fn::ImportValue:
+                    !Sub "ds-s3-endpoint-${SharedServiceStackSetName}-id"
+      Tags:
+        - Key: SharedServiceStackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  KMSCMKAlias:
+    Type: 'AWS::KMS::Alias'
+    Properties:
+      AliasName: !Sub "alias/ds-s3-data-lake-kms-cmk-${SharedServiceStackSetName}"
+      TargetKeyId: !Ref KMSCMK
+
+  KMSCMKArn:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-s3-data-lake-kms-cmk-${SharedServiceStackSetName}-arn"
+      Type: String
+      Value: !GetAtt
+        - KMSCMK
+        - Arn
+      Description: SageMakerExecRole ARN
+
+  DataLakeBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName:
+        !Join
+          - ''
+          -
+            - 'ds-data-lake-'
+            - !Select
+              - 4
+              - !Split
+                - '-'
+                - !Select
+                  - 2
+                  - !Split
+                    - /
+                    - !Ref 'AWS::StackId'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: TRUE
+        BlockPublicPolicy: TRUE
+        IgnorePublicAcls: TRUE
+        RestrictPublicBuckets: TRUE
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !Ref KMSCMK
+      Tags:
+        - Key: SharedServiceStackSetName
+          Value: !Ref SharedServiceStackSetName
+
+  S3DataLakeBucketNameSSMParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-s3-data-lake-bucket-${SharedServiceStackSetName}"
+      Type: String
+      Value: !Ref DataLakeBucket
+      Description: Shared S3 data lake bucket name for data science teams.

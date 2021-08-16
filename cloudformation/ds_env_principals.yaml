@@ -1,0 +1,237 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+Description: |
+  Template to create IAM principals for operation within the data science environment.
+
+Parameters:
+  TeamName:
+    Type: String
+    AllowedPattern: '[A-Za-z0-9\-]*'
+    Description: Please specify your team name.  Used as a suffix for team's resource names.
+
+  EnvType:
+    Description: System Environment
+    Type: String
+    Default: dev
+
+Outputs:
+  DataScientistAdminRoleArn:
+    Description: ARN of the data science administration role for this project
+    Value: !GetAtt DataScientistAdminRole.Arn
+    Export:
+      Name: !Sub "ds-admin-role-${TeamName}-${EnvType}-arn"
+
+  DataScientistUserRoleArn:
+    Description: ARN of the data science user role for this project
+    Value: !GetAtt DataScientistRole.Arn
+    Export:
+      Name: !Sub "ds-user-role-${TeamName}-${EnvType}-arn"
+
+  AssumeDataScienceAdminRole:
+    Description: URL for assuming the role of a data science admin
+    Value: !Sub 'https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${DataScientistAdminRole}&displayName=${DataScientistAdminRole}'
+
+  AssumeDataScientistUserRole:
+    Description: URL for assuming the role of a data science user
+    Value: !Sub 'https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${DataScientistRole}&displayName=${DataScientistRole}'
+
+
+Resources:
+  DataScientistAdminRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'sts:AssumeRole'
+          - Sid: SageMakerTrustRelantionship
+            Effect: Allow
+            Principal:
+              Service:
+                - 'sagemaker.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      RoleName: !Sub "ds-admin-role-${TeamName}-${EnvType}"
+      Policies:
+        - PolicyName: SageMakerAccessInlinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DSAdminAdditionalPolicies
+                Effect: Allow
+                Action:
+                  - 'sagemaker:AddTags'
+                  - 'sagemaker:CreateUserProfile'
+                  - 'sagemaker:CreateNotebookInstance'
+                  - 'sagemaker:CreateNotebookInstanceLifecycleConfig'
+                  - 'sagemaker:CreateApp'
+                  - 'sagemaker:CreateAppImageConfig'
+                  - 'sagemaker:CreateImage'
+                  - 'sagemaker:CreateImageVersion'
+                  - 'sagemaker:DeleteImage'
+                  - 'sagemaker:DeleteImageVersion'
+                  - 'sagemaker:DeleteUserProfile'
+                  - 'sagemaker:DeleteApp'
+                  - 'sagemaker:DeleteNotebookInstance'
+                  - 'sagemaker:DeleteAppImageConfig'
+                  - 'sagemaker:DeleteNotebookInstanceLifecycleConfig'
+                  - 'sagemaker:DeleteTags'
+                  - 'sagemaker:UpdateNotebookInstance'
+                  - 'sagemaker:UpdateAppImageConfig'
+                  - 'sagemaker:UpdateNotebookInstanceLifecycleConfig'
+                  - 'sagemaker:UpdateDomain'
+                  - 'sagemaker:UpdateUserProfile'
+                  - 'iam:TagRole'
+                  - 'kms:CreateGrant'
+                  - 'kms:DescribeKey'
+                Resource: '*'
+              - Sid: SageMakerIamPassRole
+                Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService':
+                      - sagemaker.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSServiceCatalogAdminFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess'
+        - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeCommitFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeArtifactAdminAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType
+
+  DataScientistRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'sts:AssumeRole'
+          - Sid: SageMakerTrustRelantionship
+            Effect: Allow
+            Principal:
+              Service:
+                - 'sagemaker.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      RoleName: !Sub "ds-user-role-${TeamName}-${EnvType}"
+      Policies:
+        - PolicyName: SageMakerAccessInlinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DataScientistAdditionalPolicies
+                Effect: Allow
+                Action:
+                  - 'sagemaker:UpdateCodeRepository'
+                  - 'sagemaker:DeleteCodeRepository'
+                  - 'sagemaker:CreateCodeRepository'
+                  - 'sagemaker:StartNotebookInstance'
+                  - 'sagemaker:StopNotebookInstance'
+                  - 'sagemaker:CreatePresignedDomainUrl'
+                  - 'sagemaker:CreatePresignedNotebookInstanceUrl'
+                  - 'sagemaker:CreateApp'
+                  - 'sagemaker:AddTags'
+                  - 'sagemaker:DeleteApp'
+                  - 'sagemaker:GetSagemakerServicecatalogPortfolioStatus'
+                  - 'codecommit:BatchGetRepositories'
+                  - 'codecommit:ListRepositories'
+                  - 'iam:TagRole'
+                  - 'kms:CreateGrant'
+                  - 'kms:Decrypt'
+                  - 'kms:DescribeKey'
+                  - 'kms:Encrypt'
+                  - 'kms:ReEncrypt'
+                  - 'kms:GenerateDataKey'
+                  - 'kms:ListAliases'
+                  - 'servicecatalog:ListAcceptedPortfolioShares'
+                  - 'servicecatalog:ListPrincipalsForPortfolio'
+                Resource: '*'
+              - Sid: CodeCommitAccess
+                Effect: Allow
+                Action:
+                  - 'codecommit:GitPull'
+                  - 'codecommit:GitPush'
+                  - 'codecommit:CreateBranch'
+                  - 'codecommit:DeleteBranch'
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:ListBranches'
+                  - 'codecommit:UpdateDefaultBranch'
+                  - 'codecommit:CreatePullRequest'
+                  - 'codecommit:CreatePullRequestApproval'
+                  - 'codecommit:GetPullRequest*'
+                  - 'codecommit:ListPullRequests'
+                  - 'codecommit:UpdatePullRequest*'
+                  - 'codecommit:DescribePullRequestEvents'
+                  - 'codecommit:CreateCommit'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:BatchGetCommits'
+                  - 'codecommit:GetCommitHistory'
+                  - 'codecommit:GetDifferences'
+                  - 'codecommit:GetReferences'
+                  - 'codecommit:GetRepository'
+                  - 'codecommit:GetMerge*'
+                  - 'codecommit:Merge*'
+                  - 'codecommit:DescribeMergeConflicts'
+                  - 'codecommit:GetComment*'
+                  - 'codecommit:PostComment*'
+                  - 'codecommit:PutCommentReaction'
+                  - 'codecommit:UpdateComment*'
+                  - 'codecommit:PutFile'
+                  - 'codecommit:GetFile'
+                  - 'codecommit:DeleteFile'
+                  - 'codecommit:GetFolder'
+                  - 'codecommit:GetBlob'
+                Resource:
+                  - !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:ds-source-${TeamName}-${EnvType}'
+              - Sid: SageMakerIamPassRole
+                Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService':
+                      - sagemaker.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSServiceCatalogEndUserFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSLambda_ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeCommitReadOnly'
+        - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerReadOnly'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+      Tags:
+        - Key: TeamName
+          Value: !Ref TeamName
+        - Key: EnvironmentType
+          Value: !Ref EnvType
+
+  DataScientistRoleArn:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-user-role-${TeamName}-${EnvType}-arn"
+      Type: String
+      Value: !GetAtt DataScientistRole.Arn
+      Description: SSM-Parameter - DataScientist Role Arn

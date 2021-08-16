@@ -1,0 +1,16 @@
+{
+  "AppImageConfigName": "ds-tensorflow241-image-config",
+  "KernelGatewayImageConfig": {
+    "KernelSpecs": [
+      {
+        "Name": "python3",
+        "DisplayName": "Python 3 (TensorFlow 2.4.1)"
+      }
+    ],
+    "FileSystemConfig": {
+      "MountPath": "/home/jovyan/work",
+      "DefaultUid": 1000,
+      "DefaultGid": 100
+    }
+  }
+}

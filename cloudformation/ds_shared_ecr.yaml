@@ -1,0 +1,77 @@
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+Description: |
+  Create a shared service ECR repository.
+
+Parameters:
+  SharedServiceStackSetName:
+    Type: String
+    Description: Common root name used across shared service cloudformation resources
+
+  ECRRepositoryName:
+    Type: String
+    AllowedPattern: '(?:[a-z0-9]+(?:[._-][a-z0-9]+)*/)*[a-z0-9]+(?:[._-][a-z0-9]+)*'
+    Description: Shared ECR Repository name for data science projects, see Amazon ECR documentation for details on allow patterns for name
+
+Outputs:
+  DSECRRepositoryName:
+    Description: The name of the Data Science Shared ECR Repository
+    Value: !Ref ECRRepositoryName
+    Export:
+      Name: !Sub 'ds-shared-ecr-repository-${SharedServiceStackSetName}'
+
+Resources:
+  DSECRRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      EncryptionConfiguration:
+        EncryptionType: 'KMS'
+      ImageScanningConfiguration:
+        ScanOnPush: "true"
+      ImageTagMutability: 'MUTABLE'
+      RepositoryName: !Ref ECRRepositoryName
+#      RepositoryPolicyText: |
+#        {
+#          "Version":"2012-10-17",
+#          "Statement":
+#            [
+#              {
+#                "Sid": "FullECRAdminToDSAdmin",
+#                "Effect": "Allow",
+#                "Principal": {
+#                  "AWS": [
+#                    { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/ds-admin-role*" }
+#                  ]
+#                },
+#                "Action": [
+#                  "ecr:*"
+#                ]
+#              },
+#              {
+#                "Sid": "AllowPullToDataScientist",
+#                "Effect": "Allow",
+#                "Principal": {
+#                  "AWS": [
+#                    { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/service-role/ds-notebook-role*" },
+#                    { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/ds-user-role*" }
+#                  ]
+#                },
+#                "Action": [
+#                  "ecr:BatchCheckLayerAvailability",
+#                  "ecr:GetDownloadUrlForLayer",
+#                  "ecr:GetRepositoryPolicy",
+#                  "ecr:DescribeRepositories",
+#                  "ecr:DescribeImages",
+#                  "ecr:ListImages",
+#                  "ecr:BatchGetImage",
+#                  "ecr:GetLifecyclePolicy",
+#                  "ecr:GetLifecyclePolicyPreview",
+#                  "ecr:ListTagsForResource",
+#                  "ecr:DescribeImageScanFindings"
+#                ]
+#              }
+#            ]
+#        }
+      Tags:
+        - Key: SharedServiceStackSetName
+          Value: !Ref SharedServiceStackSetName

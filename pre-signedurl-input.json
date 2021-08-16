@@ -1,0 +1,6 @@
+{
+  "DomainId": "<REPLACE_WITH_DOMAIN_ID>",
+  "UserProfileName": "<REPLACE_WITH_USER_PROFILE>",
+  "SessionExpirationDurationInSeconds": 43200,
+  "ExpiresInSeconds": 300
+}
