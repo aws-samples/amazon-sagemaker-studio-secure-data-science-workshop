@@ -52,6 +52,7 @@ Resources:
     Type: 'AWS::KMS::Key'
     Properties:
       Description: KMS key for S3 buckets
+      EnableKeyRotation: true
       KeyPolicy:
         Id: key-policy-1
         Version: 2012-10-17
