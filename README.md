@@ -2,7 +2,15 @@
 
 ## Overview
 
-Amazon SageMaker is a powerful enabler and a key component of a data science environment, but it’s only part of what is required to build a complete and secure data science environment. For more robust security you will need other AWS services such as Amazon CloudWatch, Amazon S3, and AWS VPC. This project aims to be an example of how to pull together these services, to use them together to create secure, self-service, data science environments.
+Amazon SageMaker is a powerful enabler and a key component of a data science environment, but it’s only part of what is 
+required to build a complete and secure data science environment. For more robust security you will need other AWS 
+services such as AWS VPC, AWS IAM, AWS KMS, Amazon CloudWatch, Amazon S3, and AWS Service Catalog just to name a few. 
+This project aims to be an example of how to pull together these services, to use them together to create secure,
+self-service, data science environments.
+
+This github repository is a companion to the [Secure Data Science with Amazon SageMaker Studio Workshop](
+https://catalog.us-east-1.prod.workshops.aws/v2/workshops/c882cd42-8ec8-4112-9469-9fab33471e85/en-US/). You can find detailed 
+instructions for using the content of this github repository in the workshop.
 
 ## Table of Contents
 
