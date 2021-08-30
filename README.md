@@ -104,7 +104,6 @@ will then create a data science team environment consisting of:
 - A team Git repository hosted by [AWS CodeCommit](https://aws.amazon.com/codecommit/)
 - Team-specific encryption keys managed by [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/)
 - Dedicated [AWS Identity & Access Management (IAM)](https://aws.amazon.com/iam/) roles for team resources
-- A team-specific product portfolio so team members can provision resources for themselves
 
 To use the environment, a data science team members can assume the *Data Science Administrator* role or the *Data Scientist User* role.  
 Once they have assumed a Data Science Administrator role users can provision resources within the data science environment.  
