@@ -105,18 +105,22 @@ will then create a data science team environment consisting of:
 - Team-specific encryption keys managed by [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/)
 - Dedicated [AWS Identity & Access Management (IAM)](https://aws.amazon.com/iam/) roles for team resources
 
-To use the environment, a data science team members can assume the *Data Science Administrator* role or the *Data Scientist User* role.  
-Once they have assumed a Data Science Administrator role users can provision resources within the data science environment.  
-Similarly once a user has assumed Data Science user role, by visiting the SageMaker service console within AWS Console
-they can launch Amazon SageMaker Studio IDE and launch Studio notebook from the Studio IDE.
+To use the data science team environment, a data science team member can assume the *Data Science Administrator* role or 
+the *Data Scientist User* role. Once they have assumed a Data Science Administrator role users can provision AWS resources 
+for which the role provides permissions within the data science team environment. Similarly, once a user has assumed 
+Data Scientist user role, they can launch Amazon SageMaker Studio IDE and launch Studio notebook from the Studio IDE.
 
-SageMaker Studio will start an Amazon SageMaker Studio-powered Jupyter notebook app.  This will produce a Studio Jupyter notebook app with:
+When SageMaker Studio IDE starts it starts Amazon SageMaker Studio-powered apps such as a Jupyter Server. You will use 
+a custom SageMaker image to configure SageMaker Studio KernelGateway app environment to work within the secure data 
+science team environment:
 
-- A KMS-encrypted Amazon S3 buckets
-- An IAM role associated with the notebook instance which represents the intersection of user, notebook instance, and a team
-- The Studio notebook apps are access AWS resources using the VPC Interface Endpoints configured for Studio VPC
-- User access to `root` permissions is disabled by SageMaker Studio
-- Studio notebook instance has no access to network resources outside of the Studio VPC
+- When Studio UserProfile is created for a user, an IAM role is associated with the Studio UserProfile with permissions 
+  to access only team resources
+- Access to a KMS-encrypted Amazon S3 bucket
+- Access to a KMS encryption key for encrypting data and models stored in S3 buckets  
+- Studio notebook apps have no access to network resources outside of the shared service VPC
+- The Studio notebook apps access AWS resources using the VPC Interface Endpoints configured for the shared service VPC
+- User access to host `root` permissions is disabled by SageMaker Studio
 - A convenience Python module generated with constants defined for AWS KMS key IDs, VPC Subnet IDs, and Security Group IDs is placed in a
   custom SageMaker docker image to setup data science for all SageMaker images (prebuilt or custom)
   
