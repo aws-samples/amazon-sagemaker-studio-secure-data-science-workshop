@@ -83,14 +83,15 @@ This repository contains the following files:
 The diagram represents high level architecture of the secure data science environment provisioned by the CloudFormation templates in 
 this project.  
 
-Once deployed, this CloudFormation stack provides you with a Data Science Product Portfolio, powered by [AWS Service Catalog](https://aws.amazon.com/servicecatalog/).  
+Once deployed, this CloudFormation stack provides you with a Data Science Product Portfolio, powered by [AWS Service Catalog](https://aws.amazon.com/servicecatalog/). 
 This allows users who have assumed the *Data Science Administrator* role to onboard SageMaker Studio domain using the
-*SageMaker Studio Product*, deploy new data science environments using the *Data Science Environment* product and onboard
-new users to SageMaker Studio domain for a data science team within the catalog. Note that SageMaker Studio domain is onboarded
-only once at AWS Account level as there can be only one Studio domain in an AWS Account.
+*SageMaker Studio Product*, deploy new data science environments using the *Data Science Team Environment* product and onboard
+new users to the SageMaker Studio domain for a data science team using *Data Science Studio User Profile* product within 
+the catalog. Note that the SageMaker Studio domain is onboarded only once in a region in an AWS Account.  
 
-Data Science Administrators can onboard SageMaker Studio in **VPCOnly** mode by specifying Studio domain name, and custom SageMaker image properties.
-AWS Service Catalog will then onboard SageMaker Studio to a shared VPC:
+Data Science Administrators can onboard SageMaker Studio only with [network access type](https://docs.aws.amazon.com/sagemaker/latest/dg/onboard-vpc.html) 
+**VPC only** by specifying Studio domain name, and custom SageMaker image properties.
+AWS Service Catalog will then onboard SageMaker Studio to the shared service VPC:
 - A private, isolated, dedicated network environment built using an [Amazon VPC](https://aws.amazon.com/vpc/).
 - [Private connectivity](https://aws.amazon.com/privatelink/) to specific AWS services such as AWS CodeArtifact, AWS ECR, AWS KMS,
   Amazon S3, SageMaker services, AWS CodeCommit to name a few. Since SageMaker Studio is onboarded in a VPCOnly mode, it is required to
