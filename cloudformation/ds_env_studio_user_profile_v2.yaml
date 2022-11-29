@@ -208,6 +208,8 @@ Resources:
                   !Sub 'ds-kms-cmk-${TeamName}-${EnvType}-arn'
               - Fn::ImportValue:
                   !Sub 'ds-sagemaker-studio-kms-cmk-${SharedServiceStackSetName}-arn'
+              - Fn::ImportValue:
+                  !Sub 'ds-data-lake-kms-cmk-${SharedServiceStackSetName}-arn'
           - Sid: CodeCommitAccess
             Effect: Allow
             Action:
@@ -270,6 +272,8 @@ Resources:
               - !Sub 'arn:aws:s3:::ds-data-bucket-${TeamName}-${EnvType}-*/*'
               - !Sub 'arn:aws:s3:::ds-model-bucket-${TeamName}-${EnvType}-*'
               - !Sub 'arn:aws:s3:::ds-model-bucket-${TeamName}-${EnvType}-*/*'
+              - 'arn:aws:s3:::ds-data-lake*'
+              - 'arn:aws:s3:::ds-data-lake*/*'
           - Effect: Allow
             Action:
               - 's3:GetBucketLocation'
