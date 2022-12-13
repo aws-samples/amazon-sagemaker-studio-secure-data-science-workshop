@@ -186,7 +186,6 @@ Resources:
                   - 'iam:CreatePolicy'
                   - 'iam:CreatePolicyVersion'
                   - 'iam:DeletePolicy'
-                  - 'iam:CreatePolicyVersion'
                   - 'iam:DeletePolicyVersion'
                   - 'iam:CreateRole'
                   - 'iam:DeleteRole'
