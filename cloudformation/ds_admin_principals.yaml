@@ -122,6 +122,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - 'cloudformation:CreateStack'
+                  - 'cloudformation:UpdateStack'
                   - 'cloudformation:DeleteStack'
                   - 'cloudformation:DescribeStacks'
                   - 'cloudformation:DescribeStackEvents'
@@ -184,6 +185,7 @@ Resources:
                   - 'iam:GetPolicy'
                   - 'iam:CreatePolicy'
                   - 'iam:DeletePolicy'
+                  - 'iam:CreatePolicyVersion'
                   - 'iam:DeletePolicyVersion'
                   - 'iam:CreateRole'
                   - 'iam:DeleteRole'
