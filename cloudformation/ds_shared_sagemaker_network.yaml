@@ -84,6 +84,12 @@ Outputs:
     Export:
       Name: !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
 
+  UserProfileSecurityGroup:
+    Description: Security Group ID for the User Profile
+    Value: !GetAtt UserProfileSecurityGroup.GroupId
+    Export:
+      Name: !Sub "ds-userprofile-sg-${SharedServiceStackSetName}"
+
 Mappings:
   RegionMap:
     us-east-1:
@@ -253,13 +259,6 @@ Resources:
         - Key: Name
           Value: !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
 
-  SecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      IpProtocol: '-1'
-      GroupId: !Ref SageMakerSecurityGroup
-      SourceSecurityGroupId: !Ref SageMakerSecurityGroup
-
   SageMakerSecurityGroupId:
     Type: 'AWS::SSM::Parameter'
     Properties:
@@ -281,6 +280,30 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "ds-vpc-http-ingress-sg-${SharedServiceStackSetName}"
+
+  UserProfileSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Security Group for SageMaker Studio User Profile.'
+      VpcId: !Ref SageMakerVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "ds-userprofile-sg-${SharedServiceStackSetName}"
+
+  UserProfileSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: '-1'
+      GroupId: !Ref UserProfileSecurityGroup
+      SourceSecurityGroupId: !Ref UserProfileSecurityGroup
+
+  UserProfileSecurityGroupId:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: !Sub "ds-userprofile-sg-${SharedServiceStackSetName}-id"
+      Type: String
+      Value: !GetAtt UserProfileSecurityGroup.GroupId
+      Description: SageMaker User Profile Security Group ID per user
 
   #########################
   #

@@ -346,6 +346,7 @@ Resources:
         SecurityGroups:
           - Fn::ImportValue:
               !Sub "ds-sagemaker-vpc-sg-${SharedServiceStackSetName}"
+              !Sub "ds-userprofile-sg-${SharedServiceStackSetName}"
       Tags:
         - Key: StackSetName
           Value: !Ref SharedServiceStackSetName
