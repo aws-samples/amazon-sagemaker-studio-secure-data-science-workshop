@@ -80,7 +80,8 @@ Resources:
       Path: /service-role/
       RoleName: !Sub 'ds-notebook-role-${TeamName}-${EnvType}-${StudioUserProfileName}'
       ManagedPolicyArns:
-        - !Ref SageMakerExecPolicy
+        - !Ref SageMakerExecPolicySageMaker
+        - !Ref SageMakerExecPolicyOtherServices
         - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
         - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
       Tags:
@@ -89,18 +90,13 @@ Resources:
         - Key: EnvironmentType
           Value: !Ref EnvType
 
-  SageMakerExecPolicy:
+  SageMakerExecPolicySageMaker:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
-      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}'
+      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}-sagemaker'
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
-            Action:
-              - 'ssm:GetParameters'
-              - 'ssm:GetParameter'
-            Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ds-*'
           - Effect: Allow
             Action:
               - 'sagemaker:CreateHyperParameterTuningJob'
@@ -174,6 +170,30 @@ Resources:
               - 'sagemaker:List*'
               - 'sagemaker:Describe*'
               - 'sagemaker:Search'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'iam:PassRole'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'iam:PassedToService':
+                  - sagemaker.amazonaws.com
+
+  SageMakerExecPolicyOtherServices:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}-other-svcs'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'ssm:GetParameters'
+              - 'ssm:GetParameter'
+            Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ds-*'
+          - Effect: Allow
+            Action:
               - 'application-autoscaling:DeleteScalingPolicy'
               - 'application-autoscaling:DeleteScheduledAction'
               - 'application-autoscaling:DeregisterScalableTarget'
@@ -323,14 +343,6 @@ Resources:
               - 'arn:aws:sns:*:*:*SageMaker*'
               - 'arn:aws:sns:*:*:*Sagemaker*'
               - 'arn:aws:sns:*:*:*sagemaker*'
-          - Effect: Allow
-            Action:
-              - 'iam:PassRole'
-            Resource: '*'
-            Condition:
-              StringEquals:
-                'iam:PassedToService':
-                  - sagemaker.amazonaws.com
 
   SageMakerStudioUserProfile:
     Type: AWS::SageMaker::UserProfile
