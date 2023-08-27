@@ -253,6 +253,8 @@ Resources:
                   - 'ssm:PutParameter'
                   - 'ssm:RemoveTagsFromResource'
                   - 'elasticfilesystem:CreateFileSystem'
+                  - 'elasticfilesystem:TagResource'
+                  - 'elasticfilesystem:UntagResource'
                   - 'sagemaker:AddTags'
                   - 'sagemaker:CreateDomain'
                   - 'sagemaker:CreateUserProfile'
