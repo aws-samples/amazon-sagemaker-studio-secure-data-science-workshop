@@ -80,7 +80,8 @@ Resources:
       Path: /service-role/
       RoleName: !Sub 'ds-notebook-role-${TeamName}-${EnvType}-${StudioUserProfileName}'
       ManagedPolicyArns:
-        - !Ref SageMakerExecPolicy
+        - !Ref SageMakerExecPolicy1
+        - !Ref SageMakerExecPolicy2
         - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
         - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
       Tags:
@@ -89,10 +90,10 @@ Resources:
         - Key: EnvironmentType
           Value: !Ref EnvType
 
-  SageMakerExecPolicy:
+  SageMakerExecPolicy1:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
-      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}'
+      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}-1'
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -193,6 +194,14 @@ Resources:
               - 'codecommit:BatchGetRepositories'
               - 'codecommit:ListRepositories'
             Resource: '*'
+
+  SageMakerExecPolicy2:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Sub 'ds-notebook-policy-${TeamName}-${EnvType}-${StudioUserProfileName}-2'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
           - Sid: KMSKeyAccess
             Effect: Allow
             Action:

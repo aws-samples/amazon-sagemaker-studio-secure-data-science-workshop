@@ -193,7 +193,7 @@ Resources:
               AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Action:
               - 'sts:AssumeRole'
-          - Sid: SageMakerTrustRelantionship
+          - Sid: SageMakerTrustRelationship
             Effect: Allow
             Principal:
               Service:
@@ -258,7 +258,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/AWSLambda_ReadOnlyAccess'
         - 'arn:aws:iam::aws:policy/AWSCodeCommitReadOnly'
         - 'arn:aws:iam::aws:policy/AWSCodeArtifactReadOnlyAccess'
-        - 'arn:aws:iam::aws:policy/AmazonSageMakerReadOnly'
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
       Tags:
         - Key: StudioDomainName
@@ -280,7 +280,7 @@ Resources:
       - SageMakerCustomImageAppConfig
     Properties:
       AppNetworkAccessType: VpcOnly
-      AuthMode: 'IAM'
+      AuthMode: IAM
       DefaultUserSettings:
         ExecutionRole: !GetAtt DataScientistDefaultRole.Arn
         SecurityGroups: 
@@ -300,7 +300,7 @@ Resources:
       KmsKeyId: !Ref SagemakerStudioKMS
       SubnetIds:
         - Fn::ImportValue:
-           !Sub 'ds-subnet1-${SharedServiceStackSetName}'
+            !Sub 'ds-subnet1-${SharedServiceStackSetName}'
         - Fn::ImportValue:
             !Sub 'ds-subnet2-${SharedServiceStackSetName}'
         - Fn::ImportValue:
