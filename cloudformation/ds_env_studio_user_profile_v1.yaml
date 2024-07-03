@@ -136,6 +136,7 @@ Resources:
               - 'sagemaker:CreateExperiment'
               - 'sagemaker:CreateModelPackage'
               - 'sagemaker:CreateModelPackageGroup'
+              - 'sagemaker:CreatePresignedDomainUrl'
               - 'sagemaker:CreateTrial'
               - 'sagemaker:CreateTrialComponent'
               - 'sagemaker:CreateApp'
